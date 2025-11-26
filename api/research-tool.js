@@ -25,8 +25,10 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Missing prompt" });
     }
 
+    // Call the NON-streaming Execute Workflow endpoint
+    // Docs: https://predict.vellum.ai/v1/execute-workflow
     const vellumResponse = await fetch(
-      "https://predict.vellum.ai/v1/execute-workflow-stream",
+      "https://predict.vellum.ai/v1/execute-workflow",
       {
         method: "POST",
         headers: {
@@ -49,24 +51,25 @@ export default async function handler(req, res) {
 
     if (!vellumResponse.ok) {
       const text = await vellumResponse.text();
-      console.error("Vellum error:", text);
+      console.error("Vellum HTTP error:", vellumResponse.status, text);
       return res.status(500).json({ error: "Vellum request failed" });
     }
 
-    const data = await vellumResponse.json();
+    const result = await vellumResponse.json();
+    // Shape per Vellum docs: { execution_id, data: { state, outputs: [...] } }
+    const data = result.data || {};
 
-    // Try to extract a text field from outputs
+    if (data.state === "REJECTED" && data.error) {
+      console.error("Vellum rejected:", data.error);
+      return res.status(500).json({ error: data.error.message || "Workflow rejected" });
+    }
+
     let outputText = "No output returned.";
 
     if (Array.isArray(data.outputs) && data.outputs.length > 0) {
       const first = data.outputs[0];
       if (typeof first.value === "string") {
         outputText = first.value;
-      }
-    } else if (data.outputs && typeof data.outputs === "object") {
-      const firstKey = Object.keys(data.outputs)[0];
-      if (firstKey && typeof data.outputs[firstKey] === "string") {
-        outputText = data.outputs[firstKey];
       }
     }
 

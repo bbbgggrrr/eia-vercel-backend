@@ -1,18 +1,20 @@
 import fetch from "node-fetch";
 
+const ALLOWED_ORIGIN = "*"; 
+// Later you can replace "*" with "https://your-squarespace-domain.com"
+
 export default async function handler(req, res) {
-  // --- CORS headers so Squarespace can call this endpoint ---
-  // You can replace * with your Squarespace domain later if you want.
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  // --- CORS headers for every request (including errors) ---
+  res.setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  // Handle preflight
+  // --- Handle preflight OPTIONS request ---
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
 
-  // Only allow POST for real requests
+  // --- Only allow POST for real work ---
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -23,7 +25,6 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Missing prompt" });
     }
 
-    // Call Vellum's execute-workflow-stream HTTP API
     const vellumResponse = await fetch(
       "https://predict.vellum.ai/v1/execute-workflow-stream",
       {
@@ -54,7 +55,7 @@ export default async function handler(req, res) {
 
     const data = await vellumResponse.json();
 
-    // Try to pull a sensible text field from outputs
+    // Try to extract a text field from outputs
     let outputText = "No output returned.";
 
     if (Array.isArray(data.outputs) && data.outputs.length > 0) {
@@ -71,8 +72,12 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ output: outputText });
   } catch (err) {
-    console.error(err);
+    console.error("Server error:", err);
     return res.status(500).json({ error: "Server error" });
   }
 }
 
+// Explicitly tell Vercel this is a Node function (not Edge)
+export const config = {
+  runtime: "nodejs18.x"
+};

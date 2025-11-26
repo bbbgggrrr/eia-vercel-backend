@@ -76,8 +76,3 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Server error" });
   }
 }
-
-// Explicitly tell Vercel this is a Node function (not Edge)
-export const config = {
-  runtime: "nodejs18.x"
-};

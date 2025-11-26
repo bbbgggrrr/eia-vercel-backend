@@ -1,16 +1,29 @@
 import fetch from "node-fetch";
 
 export default async function handler(req, res) {
+  // --- CORS headers so Squarespace can call this endpoint ---
+  // You can replace * with your Squarespace domain later if you want.
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  // Handle preflight
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
+  // Only allow POST for real requests
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
   try {
-    const { prompt } = req.body;
+    const { prompt } = req.body || {};
     if (!prompt) {
       return res.status(400).json({ error: "Missing prompt" });
     }
 
+    // Call Vellum's execute-workflow-stream HTTP API
     const vellumResponse = await fetch(
       "https://predict.vellum.ai/v1/execute-workflow-stream",
       {
@@ -41,6 +54,7 @@ export default async function handler(req, res) {
 
     const data = await vellumResponse.json();
 
+    // Try to pull a sensible text field from outputs
     let outputText = "No output returned.";
 
     if (Array.isArray(data.outputs) && data.outputs.length > 0) {
@@ -61,3 +75,4 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Server error" });
   }
 }
+
